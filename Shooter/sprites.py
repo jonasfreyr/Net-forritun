@@ -52,6 +52,8 @@ class OPlayer(pg.sprite.Sprite):
 
         self.weapon = wep
 
+        self.dead = False
+
         self.image = game.player_images[self.weapon]
 
         self.rect = self.image.get_rect()

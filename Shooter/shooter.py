@@ -241,6 +241,7 @@ class Game:
                         a.weapon = data["wep"]
                         a.rot = data["rot"]
                         a.bullets = data["bullets"]
+                        a.dead = data["dead"]
                         exist = True
                         break
 
@@ -256,21 +257,19 @@ class Game:
     def loop(self):
         self.running = True
         #pg.mixer.music.play(loops=-1)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, PORT))
-            self.s = s
-            _thread.start_new_thread(self.receive_data, (s, 2))
-            while self.running:
-                self.dt = self.clock.tick(FPS) / 1000
-                self.events()
-                if self.gp is False:
-                    self.update()
-                else:
-                    self.player.get_mouse()
+        self.s = s
+        _thread.start_new_thread(self.receive_data, (s, 2))
+        while self.running:
+            self.dt = self.clock.tick(FPS) / 1000
+            self.events()
+            if self.gp is False:
+                self.update()
+            else:
+                self.player.get_mouse()
 
-                self.draw()
+            self.draw()
 
-                self.clock.tick(FPS)
+            self.clock.tick(FPS)
 
     def events(self):
         pressed = pg.mouse.get_pressed()
@@ -376,8 +375,10 @@ class Game:
                 pass
             self.player.vel = vec(0, 0)
 
-
-
+        for a in self.players:
+            hits = pg.sprite.spritecollide(a, self.bullets, True, collide_hit_rect)
+            for hit in hits:
+                print(hit)
 
 
         for a in self.enemies:
@@ -425,7 +426,13 @@ class Game:
                       [random.randint(last_known.x, last_known.x + last_known.width),
                        random.randint(last_known.y, last_known.y + last_known.height)])
 
-        data = {"x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
+        if self.player.health <= 0:
+            ded = True
+
+        else:
+            ded = False
+
+        data = {"dead": ded, "x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
 
         for a in self.bulletsO:
             b = {"pos": (a.pos.x, a.pos.y), "dir": (a.dir.x, a.dir.y), "rot": a.rot, "wep": a.weapon}
@@ -482,8 +489,12 @@ class Game:
                 if isinstance(sprite, Ally):
                     if sprite.selected is True:
                         pg.draw.rect(self.screen, RED, self.camera.apply_rect(sprite.hit_rect), 1)
+            if isinstance(sprite, OPlayer):
+                if sprite.dead is False:
+                    self.screen.blit(sprite.image, self.camera.apply(sprite))
 
-            self.screen.blit(sprite.image, self.camera.apply(sprite))
+            else:
+                self.screen.blit(sprite.image, self.camera.apply(sprite))
 
         if self.night:
             self.render_fog()
@@ -653,10 +664,6 @@ class Game:
                         elif FPS == 60:
                             FPS = 120
 
-                    if click == 'Bonus Map: {}'.format(BONUS_MAP):
-                        BONUS_MAP = self.change_map()
-                        pass
-
                     if click == 'Night Mode: {}'.format(NIGHT_MODE):
                         NIGHT_MODE = not NIGHT_MODE
 
@@ -668,7 +675,7 @@ class Game:
 
             elif self.setting:
                 #
-                self.button = ['Full: {}'.format(full), 'Bonus Map: {}'.format(BONUS_MAP), 'FPS: {}'.format(FPS), 'Night Mode: {}'.format(NIGHT_MODE), 'Back']
+                self.button = ['Full: {}'.format(full), 'FPS: {}'.format(FPS), 'Night Mode: {}'.format(NIGHT_MODE), 'Back']
 
             self.draw_screen()
 
@@ -677,15 +684,19 @@ class Game:
 H = Game()
 H.load_data()
 first = True
-while True:
-    if first is True:
-        H.start_screen()
-        first = False
-    else:
-        H.new()
-    if H.player.health <= 0:
-        end = H.go_screen()
-    else:
-        end = H.win_screen()
-    if end is True:
-        break
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.connect((HOST, PORT))
+    MAPNUM = int(s.recv(65536).decode())
+    MAP = MAPS[MAPNUM]
+    while True:
+        if first is True:
+            H.start_screen()
+            first = False
+        else:
+            H.new()
+        if H.player.health <= 0:
+            end = H.go_screen()
+        else:
+            end = H.win_screen()
+        if end is True:
+            break

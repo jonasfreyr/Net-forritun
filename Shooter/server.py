@@ -1,17 +1,36 @@
 import socket, _thread
 
-HOST = '127.0.0.1'   # Standard loopback interface address (localhost)
+HOST = '0.0.0.0'   # Standard loopback interface address (localhost)
 PORT = 65432
 conns = []
 id = 1
+MAPNUM = 0
 
 def new_client(conn, addr, id):
     print("Connection started with:", addr)
-
+    conn.sendall(str(MAPNUM).encode())
     while True:
         try:
-            data = conn.recv(65536)
-            data = eval(data)
+            data = conn.recv(65536).decode()
+            try:
+                data = eval(data)
+            except:
+                s = ""
+                count = 0
+                for a in data:
+                    s = s + a
+
+                    if a == "{":
+                        count += 1
+
+                    elif a == "}":
+                        count -= 1
+
+                    if count == 0:
+                        break
+
+
+                data = eval(s)
 
             data["id"] = id
 
@@ -19,7 +38,7 @@ def new_client(conn, addr, id):
 
             data = str(data).encode()
 
-        except ConnectionResetError:
+        except:
             print("Connection ended with:", addr)
 
             conns.remove(conn)
