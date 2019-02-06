@@ -130,11 +130,11 @@ class Game:
 
         self.mapCounter = 0
         self.players = []
+        self.enemies = pg.sprite.Group()
 
     def new(self):
         self.all_sprites = pg.sprite.LayeredUpdates()
         self.walls = pg.sprite.Group()
-        self.enemies = pg.sprite.Group()
         self.ally = pg.sprite.Group()
         self.bullets = pg.sprite.Group()
         self.bulletsO = pg.sprite.Group()
@@ -158,7 +158,7 @@ class Game:
 
                 else:
                     self.spawn.append(pg.Rect(tile_object.x, tile_object.y, tile_object.width, tile_object.height))
-
+        tel = 0
         for tile_object in self.map.tmxdata.objects:
             obj_center = vec(tile_object.x + tile_object.width / 2, tile_object.y + tile_object.height / 2)
             if tile_object.name == "Player":
@@ -169,8 +169,8 @@ class Game:
 
             if tile_object.name == "Enemy":
                 if self.last_known == []:
-                    Enemy(self, obj_center.x, obj_center.y, tile_object.type)
-
+                    Enemy(self, obj_center.x, obj_center.y, tile_object.type, tel)
+                    tel += 1
                 else:
                     closest = vec(9999, 9999)
                     for a in self.last_known:
@@ -183,8 +183,8 @@ class Game:
                             closest = target_dist
                             last_known = a
 
-                    Enemy(self, obj_center.x, obj_center.y, tile_object.type, [random.randint(last_known.x, last_known.x + last_known.width), random.randint(last_known.y, last_known.y + last_known.height)])
-
+                    Enemy(self, obj_center.x, obj_center.y, tile_object.type, tel,[random.randint(last_known.x, last_known.x + last_known.width), random.randint(last_known.y, last_known.y + last_known.height)])
+                    tel += 1
             if tile_object.name == "Ally":
                 Ally(self, obj_center.x, obj_center.y, tile_object.type)
 
@@ -203,6 +203,7 @@ class Game:
         self.blood_screenBool = False
         self.blood_screenTimer = 0
         self.player_inventory = PLAYER_INVENTORY
+        self.enemies_last = {}
 
         #self.effects_sounds['level_start'].play()
 
@@ -228,9 +229,8 @@ class Game:
                     if count == 0:
                         break
 
-
                 data = eval(s)
-            #{"x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
+            # {"x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
             if not isinstance(data, int):
                 exist = False
                 for a in self.players:
@@ -244,6 +244,18 @@ class Game:
                         a.dead = data["dead"]
                         exist = True
                         break
+
+                for a in self.enemies:
+                    for b in data["enemies"]:
+                        if a.id == b["id"]:
+                            # {"pos": (a.pos.x, a.pos.y), "rot": a.rot, "wep": a.weapon, "id": a.id}
+                            a.pos.x = b["pos"][0]
+                            a.pos.y = b["pos"][1]
+                            a.rot = b["rot"]
+                            a.health = b["health"]
+                            a.is_ded = b["ded"]
+
+
 
                 if exist is False:
                     OPlayer(self, data["x"], data["y"], data["wep"], data["rot"], data["id"], data["bullets"])
@@ -386,6 +398,8 @@ class Game:
             for hit in hits:
                 a.health -= WEAPONS[hit.weapon]['damage']
                 a.vel = vec(0, 0)
+                if a.is_ded:
+                    a.kill()
 
         for a in self.ally:
             hits = pg.sprite.spritecollide(a, self.bullets, True, collide_hit_rect)
@@ -406,8 +420,7 @@ class Game:
             while wep == "mini":
                 wep = random.choice(WEAPON)
 
-
-            if self.last_known == []:
+            if self.last_known is []:
                 Enemy(self, x, y, wep)
 
             else:
@@ -432,7 +445,13 @@ class Game:
         else:
             ded = False
 
-        data = {"dead": ded, "x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
+
+        data = {"dead": ded, "x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": [], "enemies": []}
+        if MAIN is True:
+            for a in self.enemies:
+                b = {"pos": (a.pos.x, a.pos.y), "rot": a.rot, "wep": a.weapon, "id": a.id, "health": a.health, "ded": a.is_ded}
+
+                data["enemies"].append(b)
 
         for a in self.bulletsO:
             b = {"pos": (a.pos.x, a.pos.y), "dir": (a.dir.x, a.dir.y), "rot": a.rot, "wep": a.weapon}
@@ -688,6 +707,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
     MAPNUM = int(s.recv(65536).decode())
     MAP = MAPS[MAPNUM]
+    MAIN = eval(s.recv(65536).decode())
     while True:
         if first is True:
             H.start_screen()

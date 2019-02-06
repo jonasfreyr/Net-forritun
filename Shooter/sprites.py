@@ -238,7 +238,7 @@ class Player(pg.sprite.Sprite):
 
 
 class Enemy(pg.sprite.Sprite):
-    def __init__(self, game, x, y, weapon, last_known=None, move=True):
+    def __init__(self, game, x, y, weapon, id, last_known=None, move=True):
         self._layer = ENEMY_LAYER
 
         self.groups = game.all_sprites, game.enemies
@@ -258,6 +258,7 @@ class Enemy(pg.sprite.Sprite):
         self.rot = 0
 
         self.can_move = move
+        self.id = id
 
         if weapon != "mini":
             self.health = ENEMY_HEALTH
@@ -280,6 +281,7 @@ class Enemy(pg.sprite.Sprite):
             self.last_known = last_known
 
         self.weapon = weapon
+        self.is_ded = False
 
     def draw_hit_box(self):
         hit_box = self.hit_rect.move(self.game.camera.camera.topleft)
@@ -404,6 +406,13 @@ class Enemy(pg.sprite.Sprite):
         self.target = self.game.player
         closest = self.target.pos - self.pos
         for a in self.game.ally:
+            target_dist = a.pos - self.pos
+
+            if target_dist.length() < closest.length():
+                closest = target_dist
+                self.target = a
+
+        for a in self.game.players:
             target_dist = a.pos - self.pos
 
             if target_dist.length() < closest.length():
