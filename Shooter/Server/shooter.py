@@ -3,7 +3,7 @@ from settings import *
 from sprites import *
 from os import path
 from tilemap import *
-from hud import *
+#from hud import *
 import random, socket, _thread, math
 
 
@@ -25,8 +25,8 @@ class Game:
         quit()
 
     def load_data(self):
-        self.host_bullets = []
         game_folder = path.dirname(__file__)
+        game_folder = path.join(game_folder, "..")
         img_folder = path.join(game_folder, 'img')
         self.map_folder = path.join(game_folder, 'maps')
         self.bonus_map_folder = path.join(self.map_folder, 'bonusmaps')
@@ -160,7 +160,6 @@ class Game:
                 else:
                     self.spawn.append(pg.Rect(tile_object.x, tile_object.y, tile_object.width, tile_object.height))
         tel = 0
-        item_tel = 0
         for tile_object in self.map.tmxdata.objects:
             obj_center = vec(tile_object.x + tile_object.width / 2, tile_object.y + tile_object.height / 2)
             if tile_object.name == "Player":
@@ -191,8 +190,7 @@ class Game:
                 Ally(self, obj_center.x, obj_center.y, tile_object.type)
 
             if tile_object.name in ITEM_IMAGES:
-                Item(self, obj_center, tile_object.name, item_tel)
-                item_tel += 1
+                Item(self, obj_center, tile_object.name)
 
         self.camera = Camera(self.map.width, self.map.height)
 
@@ -239,44 +237,19 @@ class Game:
             # {"x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
             if not isinstance(data, int):
                 exist = False
-                # print(data)
-                if len(data) > 3:
-                    for a in self.players:
-                        if a.id == data["id"]:
-                            a.pos.x = data["x"]
-                            a.pos.y = data["y"]
+                for a in self.players:
+                    if a.id == data["id"]:
+                        a.pos.x = data["x"]
+                        a.pos.y = data["y"]
 
-                            a.weapon = data["wep"]
-                            a.rot = data["rot"]
-                            a.bullets = data["bullets"]
-                            a.dead = data["dead"]
-                            exist = True
-                            break
+                        a.weapon = data["wep"]
+                        a.rot = data["rot"]
+                        a.bullets = data["bullets"]
+                        a.dead = data["dead"]
+                        exist = True
+                        break
 
-                    for a in self.items:
-                        for b in data["items"]:
-                            if a.id == b["id"]:
-                                print(a.picked)
-                                a.picked = b["picked"]
-
-                else:
-                    self.host_bullets = data["bullets"]
-
-
-                try:
-                    for a in self.enemies:
-                        for b in data["enemies"]:
-                            if a.id == b["id"]:
-                                # {"pos": (a.pos.x, a.pos.y), "rot": a.rot, "wep": a.weapon, "id": a.id}
-                                a.pos.x = b["pos"][0]
-                                a.pos.y = b["pos"][1]
-                                a.rot = b["rot"]
-                                a.health = b["health"]
-                                a.is_ded = b["ded"]
-                except:
-                    pass
-
-                if exist is False and len(data) > 3:
+                if exist is False:
                     OPlayer(self, data["x"], data["y"], data["wep"], data["rot"], data["id"], data["bullets"])
 
             else:
@@ -297,8 +270,6 @@ class Game:
                 self.update()
             else:
                 self.player.get_mouse()
-
-            self.draw()
 
             self.clock.tick(FPS)
 
@@ -337,81 +308,12 @@ class Game:
 
         self.camera.update(target)
 
-
         for a in self.players:
             if len(a.bullets) > 0:
                 for b in a.bullets:
                     Bullet(self, b["pos"], b["dir"], b["rot"], b["wep"], True)
 
                 a.bullets = []
-
-        for b in self.host_bullets:
-            Bullet(self, b["pos"], b["dir"], b["rot"], b["wep"], True)
-
-            self.host_bullets = []
-
-        hits = pg.sprite.spritecollide(self.player, self.items, False)
-        for hit in hits:
-            hit.picked = True
-            if hit.type == "Health" and self.player.health < PLAYER_HEALTH:
-                hit.kill()
-                try:
-                    self.effects_sounds['health_up'].play()
-                except:
-                    pass
-                self.player.add_health(HEALTH_PACK_AMOUNT)
-
-            elif hit.type == "Ammo_box" and self.player.maxammo < WEAPONS[self.player.weapon]['ammo_max']:
-                hit.kill()
-                try:
-                    self.effects_sounds['ammo_pickup'].play()
-                except:
-                    pass
-                self.player.maxammo = WEAPONS[self.player.weapon]['ammo_max']
-                self.player.ammo = WEAPONS[self.player.weapon]['ammo_clip']
-
-            elif hit.type == "armor" and self.player.armor < PLAYER_ARMOR:
-                hit.kill()
-                try:
-                    self.effects_sounds['armor_pickup'].play()
-                except:
-                    pass
-                self.player.armor = PLAYER_ARMOR
-
-            elif hit.type in WEAPONS:
-                hit.kill()
-                try:
-                    self.effects_sounds['gun_pickup'].play()
-                except:
-                    pass
-                self.player.weapon = hit.type
-
-                self.player.ammo = WEAPONS[self.player.weapon]['ammo_clip']
-                self.player.maxammo = WEAPONS[self.player.weapon]['ammo_max']
-
-        hits = pg.sprite.spritecollide(self.player, self.bullets, collide_hit_rect, collide_hit_rect)
-        for hit in hits:
-            if self.player.armor <= 0:
-                self.player.health -= WEAPONS[hit.weapon]['damage']
-                pass
-
-            else:
-                self.player.armor -= WEAPONS[hit.weapon]['damage']
-
-            if self.player.armor <= 0:
-                self.player.armor = 0
-
-            if self.player.health <= 0:
-                self.running = False
-
-        if hits:
-            self.blood_screenTimer = pg.time.get_ticks()
-            self.blood_screenBool = True
-            try:
-                random.choice(self.player_hit_sounds).play()
-            except:
-                pass
-            self.player.vel = vec(0, 0)
 
         for a in self.players:
             hits = pg.sprite.spritecollide(a, self.bullets, True, collide_hit_rect)
@@ -472,12 +374,12 @@ class Game:
             ded = False
 
 
-        data = {"dead": ded, "x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": [], "items": []}
+        data = {"bullets": [], "enemies": []}
+        if MAIN is True:
+            for a in self.enemies:
+                b = {"pos": (a.pos.x, a.pos.y), "rot": a.rot, "wep": a.weapon, "id": a.id, "health": a.health, "ded": a.is_ded}
 
-        for a in self.items:
-            b = {"picked": a.picked, "id": a.id}
-
-            data["items"].append(b)
+                data["enemies"].append(b)
 
         for a in self.bulletsO:
             b = {"pos": (a.pos.x, a.pos.y), "dir": (a.dir.x, a.dir.y), "rot": a.rot, "wep": a.weapon}
@@ -735,14 +637,4 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     MAP = MAPS[MAPNUM]
     MAIN = eval(s.recv(65536).decode())
     while True:
-        if first is True:
-            H.start_screen()
-            first = False
-        else:
-            H.new()
-        if H.player.health <= 0:
-            end = H.go_screen()
-        else:
-            end = H.win_screen()
-        if end is True:
-            break
+        H.new()

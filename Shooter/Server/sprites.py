@@ -3,7 +3,7 @@ from settings import *
 from tilemap import collide_hit_rect
 import random, math
 import pytweening as tween
-from hud import *
+#from hud import *
 
 
 def collide_with_walls(sprite, group, dir):
@@ -270,8 +270,6 @@ class Enemy(pg.sprite.Sprite):
 
         self.last_shot = 0
 
-        self.target = game.player
-
         if last_known is None or self.can_move is False:
             self.moving = False
             self.last_known = [int(self.pos.x), int(self.pos.y)]
@@ -287,10 +285,206 @@ class Enemy(pg.sprite.Sprite):
         hit_box = self.hit_rect.move(self.game.camera.camera.topleft)
         pg.draw.rect(self.game.screen, WHITE, hit_box, 2)
 
+    def avoid_mobs(self):
+        for enemy in self.game.enemies:
+            if enemy != self:
+                dist = self.pos - enemy.pos
+                if 0 < dist.length() < AVOID_RADIUS:
+                    self.acc += dist.normalize()
+
+    def lineLine(self, x1, y1, x2, y2, x3, y3, x4, y4):
+
+        uA = ((x4-x3)*(y1-y3) - (y4-y3)*(x1-x3)) / ((y4-y3)*(x2-x1) - (x4-x3)*(y2-y1))
+
+        uB = ((x2-x1)*(y1-y3) - (y2-y1)*(x1-x3)) / ((y4-y3)*(x2-x1) - (x4-x3)*(y2-y1))
+
+        if (uA >= 0 and uA <= 1 and uB >= 0 and uB <= 1):
+            return True
+
+        else:
+            return False
+
+    def line_collide(self):
+        target_dist = self.target.pos - self.pos
+        rot = target_dist.angle_to(vec(1, 0))
+        pos = self.pos + BARREL_OFFSET.rotate(-rot)
+
+        for a in self.game.walls:
+            r = a.rect.copy()
+            topleft = r.topleft
+            topright = r.topright
+
+            bottomleft = r.bottomleft
+            bottomright = r.bottomright
+
+            left = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, topleft[0], topleft[1], topleft[0], bottomleft[1])
+
+            right = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, topright[0], topright[1], topright[0], bottomright[1])
+
+            top = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, topleft[0], topleft[1], topright[0], topright[1])
+
+            bottom = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, bottomleft[0], bottomleft[1], bottomright[0], bottomright[1])
+
+            if left or right or top or bottom:
+                return True
+
+        for a in self.game.enemies:
+            r = a.hit_rect.copy()
+            topleft = r.topleft
+            topright = r.topright
+
+            bottomleft = r.bottomleft
+            bottomright = r.bottomright
+
+            left = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, topleft[0], topleft[1], topleft[0],
+                                 bottomleft[1])
+
+            right = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, topright[0], topright[1],
+                                  topright[0], bottomright[1])
+
+            top = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, topleft[0], topleft[1], topright[0],
+                                topright[1])
+
+            bottom = self.lineLine(pos.x, pos.y, self.target.pos.x, self.target.pos.y, bottomleft[0], bottomleft[1],
+                                   bottomright[0], bottomright[1])
+
+            if left or right or top or bottom:
+                return True
+
+        return False
+
+    def rot_towards_target(self, target_dist):
+        rotT = target_dist.angle_to(vec(1, 0))
+
+        angle = math.atan2(-target_dist.x, -target_dist.y)/math.pi * 180.0
+
+        diff = (angle - self.rot - 90) % 360
+
+        if 175 < int(diff) < 183:
+            rot = rotT
+
+        elif diff > 180:
+            rot = self.rot + ENEMY_ROTATION_SPEED
+
+        else:
+            rot = self.rot - ENEMY_ROTATION_SPEED
+
+        return rot
+
+    def move(self):
+        target_dist = self.last_known - self.pos
+        self.rot = self.rot_towards_target(target_dist)
+        # self.rot = target_dist.angle_to(vec(1, 0))
+
+        self.acc = vec(1, 0).rotate(-self.rot)
+        self.avoid_mobs()
+
+        try:
+            self.acc.scale_to_length(ENEMY_SPEED)
+
+        except:
+            pass
+
+        self.acc += self.vel * -1.5
+
+        self.vel += self.acc * self.game.dt
+        self.pos += self.vel * self.game.dt + 0.5 * self.acc * self.game.dt ** 2
+
+        self.hit_rect.centerx = self.pos.x
+        collide_with_walls(self, self.game.walls, "x")
+        collide_with_walls(self, self.game.windows, "x")
+
+        self.hit_rect.centery = self.pos.y
+        collide_with_walls(self, self.game.walls, "y")
+        collide_with_walls(self, self.game.windows, "y")
+
+        self.rect.center = self.hit_rect.center
+
     def update(self):
-        self.rect = self.image.get_rect()
-        self.rect.center = self.pos
-        self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
+        closest = vec(9999999, 999999)
+        #closest = self.target.pos - self.pos
+        for a in self.game.ally:
+            target_dist = a.pos - self.pos
+
+            if target_dist.length() < closest.length():
+                closest = target_dist
+                self.target = a
+
+        for a in self.game.players:
+            if a.dead is False:
+                target_dist = a.pos - self.pos
+
+                if target_dist.length() < closest.length():
+                    closest = target_dist
+                    self.target = a
+
+        target_dist = closest
+        if target_dist.length_squared() < (WEAPONS[self.weapon]['detect_radius'] - NIGHT_RADIUS) ** 2:
+            if self.line_collide() is False:
+                self.moving = False
+
+                self.vel = vec(0, 0)
+
+                self.last_known = [int(self.target.pos.x), int(self.target.pos.y)]
+
+                pos = self.pos + BARREL_OFFSET.rotate(-self.rot)
+                target_distA = self.target.pos - pos
+
+                self.rot = self.rot_towards_target(target_distA)
+
+                self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
+
+                self.rect = self.image.get_rect()
+                self.rect.center = self.pos
+
+                rot = target_dist.angle_to(vec(1, 0))
+
+                if self.rot - 20 < rot < self.rot + 20:
+                    self.shoot()
+
+            else:
+                self.moving = True
+                self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
+        else:
+            self.moving = True
+            self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
+
+        pos = [int(self.pos.x), int(self.pos.y)]
+
+        if ((pos[0] - 5 < self.last_known[0]) and (pos[1] - 5 < self.last_known[1])) and ((pos[0] + 5 > self.last_known[0]) and (pos[1] + 5 > self.last_known[1])):
+            self.moving = False
+
+        if self.moving and self.can_move is True:
+            self.move()
+
+        if self.health <= 0:
+            random.choice(self.game.enemy_hit_sounds).play()
+            self.kill()
+            self.game.map_img.blit(self.game.blood, self.pos - vec(TILESIZE / 2, TILESIZE / 2))
+            self.game.kills += 1
+
+    def shoot(self):
+        now = pg.time.get_ticks()
+        if now - self.last_shot > WEAPONS[self.weapon]['rate']:
+            self.last_shot = now
+
+            dir = vec(1, 0).rotate(-self.rot)
+
+            pos = self.pos + BARREL_OFFSET.rotate(-self.rot)
+
+            for a in range(WEAPONS[self.weapon]['bullet_count']):
+                spread = random.uniform(-WEAPONS[self.weapon]['spread'], WEAPONS[self.weapon]['spread'])
+                Bullet(self.game, pos, dir.rotate(spread), self.rot, self.weapon)
+
+                snd = random.choice(self.game.weapon_sounds[self.weapon])
+                if snd.get_num_channels() > 2:
+                    snd.stop()
+
+                snd.play()
+
+            MuzzleFlash(self.game, pos, self.rot, self.vel)
+
+            #self.vel = vec(-WEAPONS[self.weapon]['kickback']).rotate(-self.rot)
 
     def draw_health(self):
         if self.health > int((self.maxHealth / 3) * 2):
@@ -641,7 +835,7 @@ class MuzzleFlash(pg.sprite.Sprite):
 
 
 class Item(pg.sprite.Sprite):
-    def __init__(self, game, pos, type, id):
+    def __init__(self, game, pos, type):
         self._layer = ITEMS_LAYER
 
         self.groups = game.all_sprites, game.items
@@ -661,8 +855,7 @@ class Item(pg.sprite.Sprite):
         self.step = 0
         self.dir = 1
 
-        self.id = id
-        self.picked = False
+        self.picked = True
 
     def update(self):
         offset = BOB_RANGE * (self.tween(self.step / BOB_RANGE) - 0.5)
