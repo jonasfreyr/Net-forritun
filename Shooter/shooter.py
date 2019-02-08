@@ -133,6 +133,7 @@ class Game:
         self.enemies = pg.sprite.Group()
 
     def new(self):
+        self.main = MAIN
         self.all_sprites = pg.sprite.LayeredUpdates()
         self.walls = pg.sprite.Group()
         self.ally = pg.sprite.Group()
@@ -324,74 +325,68 @@ class Game:
                     Bullet(self, b["pos"], b["dir"], b["rot"], b["wep"], True)
 
                 a.bullets = []
-
-        hits = pg.sprite.spritecollide(self.player, self.items, False)
-        for hit in hits:
-            if hit.type == "Health" and self.player.health < PLAYER_HEALTH:
-                hit.kill()
-                try:
-                    self.effects_sounds['health_up'].play()
-                except:
-                    pass
-                self.player.add_health(HEALTH_PACK_AMOUNT)
-
-            elif hit.type == "Ammo_box" and self.player.maxammo < WEAPONS[self.player.weapon]['ammo_max']:
-                hit.kill()
-                try:
-                    self.effects_sounds['ammo_pickup'].play()
-                except:
-                    pass
-                self.player.maxammo = WEAPONS[self.player.weapon]['ammo_max']
-                self.player.ammo = WEAPONS[self.player.weapon]['ammo_clip']
-
-            elif hit.type == "armor" and self.player.armor < PLAYER_ARMOR:
-                hit.kill()
-                try:
-                    self.effects_sounds['armor_pickup'].play()
-                except:
-                    pass
-                self.player.armor = PLAYER_ARMOR
-
-            elif hit.type in WEAPONS:
-                hit.kill()
-                try:
-                    self.effects_sounds['gun_pickup'].play()
-                except:
-                    pass
-                self.player.weapon = hit.type
-
-                self.player.ammo = WEAPONS[self.player.weapon]['ammo_clip']
-                self.player.maxammo = WEAPONS[self.player.weapon]['ammo_max']
-
-        hits = pg.sprite.spritecollide(self.player, self.bullets, collide_hit_rect, collide_hit_rect)
-        for hit in hits:
-            if self.player.armor <= 0:
-                self.player.health -= WEAPONS[hit.weapon]['damage']
-                pass
-
-            else:
-                self.player.armor -= WEAPONS[hit.weapon]['damage']
-
-            if self.player.armor <= 0:
-                self.player.armor = 0
-
-            if self.player.health <= 0:
-                self.running = False
-
-        if hits:
-            self.blood_screenTimer = pg.time.get_ticks()
-            self.blood_screenBool = True
-            try:
-                random.choice(self.player_hit_sounds).play()
-            except:
-                pass
-            self.player.vel = vec(0, 0)
-
-        for a in self.players:
-            hits = pg.sprite.spritecollide(a, self.bullets, True, collide_hit_rect)
+        if self.main is False:
+            hits = pg.sprite.spritecollide(self.player, self.items, False)
             for hit in hits:
-                print(hit)
+                if hit.type == "Health" and self.player.health < PLAYER_HEALTH:
+                    hit.kill()
+                    try:
+                        self.effects_sounds['health_up'].play()
+                    except:
+                        pass
+                    self.player.add_health(HEALTH_PACK_AMOUNT)
 
+                elif hit.type == "Ammo_box" and self.player.maxammo < WEAPONS[self.player.weapon]['ammo_max']:
+                    hit.kill()
+                    try:
+                        self.effects_sounds['ammo_pickup'].play()
+                    except:
+                        pass
+                    self.player.maxammo = WEAPONS[self.player.weapon]['ammo_max']
+                    self.player.ammo = WEAPONS[self.player.weapon]['ammo_clip']
+
+                elif hit.type == "armor" and self.player.armor < PLAYER_ARMOR:
+                    hit.kill()
+                    try:
+                        self.effects_sounds['armor_pickup'].play()
+                    except:
+                        pass
+                    self.player.armor = PLAYER_ARMOR
+
+                elif hit.type in WEAPONS:
+                    hit.kill()
+                    try:
+                        self.effects_sounds['gun_pickup'].play()
+                    except:
+                        pass
+                    self.player.weapon = hit.type
+
+                    self.player.ammo = WEAPONS[self.player.weapon]['ammo_clip']
+                    self.player.maxammo = WEAPONS[self.player.weapon]['ammo_max']
+
+            hits = pg.sprite.spritecollide(self.player, self.bullets, collide_hit_rect, collide_hit_rect)
+            for hit in hits:
+                if self.player.armor <= 0:
+                    self.player.health -= WEAPONS[hit.weapon]['damage']
+                    pass
+
+                else:
+                    self.player.armor -= WEAPONS[hit.weapon]['damage']
+
+                if self.player.armor <= 0:
+                    self.player.armor = 0
+
+                if self.player.health <= 0:
+                    self.running = False
+
+            if hits:
+                self.blood_screenTimer = pg.time.get_ticks()
+                self.blood_screenBool = True
+                try:
+                    random.choice(self.player_hit_sounds).play()
+                except:
+                    pass
+                self.player.vel = vec(0, 0)
 
         for a in self.enemies:
             hits = pg.sprite.spritecollide(a, self.bullets, True, collide_hit_rect)
@@ -503,28 +498,33 @@ class Game:
         self.screen.blit(self.map_img, self.camera.apply_rect(self.map_rect))
 
         for sprite in self.all_sprites:
+            not_draw = False
             if isinstance(sprite, Enemy) or isinstance(sprite, Ally):
                 sprite.draw_health()
                 if isinstance(sprite, Ally):
                     if sprite.selected is True:
                         pg.draw.rect(self.screen, RED, self.camera.apply_rect(sprite.hit_rect), 1)
             if isinstance(sprite, OPlayer):
-                if sprite.dead is False:
+                print(sprite.id)
+                if sprite.dead is False and sprite.id != 1:
+                    self.screen.blit(sprite.image, self.camera.apply(sprite))
+
+                else:
+                    not_draw = True
+
+            if isinstance(sprite, Player):
+                if self.main is False:
                     self.screen.blit(sprite.image, self.camera.apply(sprite))
 
             else:
-                self.screen.blit(sprite.image, self.camera.apply(sprite))
+                if not_draw is False:
+                    self.screen.blit(sprite.image, self.camera.apply(sprite))
 
         if self.night:
             self.render_fog()
 
-        self.draw_hud()
-
-        if self.blood_screenBool is True:
-            self.screen.blit(self.blood_screen, (0, 0))
-            now = pg.time.get_ticks()
-            if now - self.blood_screenTimer > BLOOD_SCREEN_TIME:
-                self.blood_screenBool = False
+        if self.main is False:
+            self.draw_hud()
 
         if self.gp:
             self.menuButton = ["Quit"]
@@ -705,11 +705,32 @@ H.load_data()
 first = True
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
-    MAPNUM = int(s.recv(65536).decode())
+    i = s.recv(65536).decode()
+    p = ""
+    for a in i:
+        if a.isdigit():
+            p += a
+
+        else:
+            break
+
+    MAPNUM = int(p)
     MAP = MAPS[MAPNUM]
-    MAIN = eval(s.recv(65536).decode())
+
+    b = s.recv(65536).decode()
+
+    p = ""
+    for a in b:
+        if a.isalpha():
+            p += a
+
+        else:
+            break
+
+    MAIN = eval(p)
+
     while True:
-        if first is True:
+        if first is True and MAIN is False:
             H.start_screen()
             first = False
         else:

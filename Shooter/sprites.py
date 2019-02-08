@@ -1,10 +1,39 @@
 import pygame as pg
 from settings import *
-from tilemap import collide_hit_rect
+from tilemap import *
 import random, math
 import pytweening as tween
 from hud import *
 
+
+def out_of_map(sprite, dir):
+    if dir == 'x':
+        hit = False
+        if sprite.pos.x > sprite.game.map.width:
+            hit = True
+            sprite.pos.x = sprite.game.map.width
+
+        if sprite.pos.x < 0:
+            hit = True
+            sprite.pos.x = 0
+
+        if hit is True:
+            sprite.vel.x = 0
+            sprite.hit_rect.centerx = sprite.pos.x
+
+    if dir == 'y':
+        hit = False
+        if sprite.pos.y > sprite.game.map.height:
+            hit = True
+            sprite.pos.y = sprite.game.map.height
+
+        if sprite.pos.y < 0:
+            hit = True
+            sprite.pos.y = 0
+
+        if hit is True:
+            sprite.vel.y = 0
+            sprite.hit_rect.centery = sprite.pos.y
 
 def collide_with_walls(sprite, group, dir):
     if dir == 'x':
@@ -175,7 +204,7 @@ class Player(pg.sprite.Sprite):
 
         self.get_mouse()
 
-        if mouse[0] == 1:
+        if mouse[0] == 1 and self.game.main is False:
             if self.ammo != 0:
                 self.shoot()
 
@@ -227,12 +256,20 @@ class Player(pg.sprite.Sprite):
         self.rect = self.image.get_rect()
 
         self.hit_rect.centerx = self.pos.x
-        collide_with_walls(self, self.game.walls, 'x')
-        collide_with_walls(self, self.game.windows, 'x')
+        if self.game.main is False:
+            collide_with_walls(self, self.game.walls, 'x')
+            collide_with_walls(self, self.game.windows, 'x')
+
+        else:
+            out_of_map
 
         self.hit_rect.centery = self.pos.y
-        collide_with_walls(self, self.game.walls, 'y')
-        collide_with_walls(self, self.game.windows, 'y')
+        if self.game.main is False:
+            collide_with_walls(self, self.game.walls, 'y')
+            collide_with_walls(self, self.game.windows, 'y')
+
+        else:
+            out_of_map(self, 'y')
 
         self.rect.center = self.hit_rect.center
 
@@ -403,8 +440,12 @@ class Enemy(pg.sprite.Sprite):
         self.rect.center = self.hit_rect.center
 
     def update(self):
-        self.target = self.game.player
-        closest = self.target.pos - self.pos
+        if self.game.main is False:
+            self.target = self.game.player
+            closest = self.target.pos - self.pos
+        else:
+            closest = vec(99999,99999)
+
         for a in self.game.ally:
             target_dist = a.pos - self.pos
 
@@ -413,11 +454,12 @@ class Enemy(pg.sprite.Sprite):
                 self.target = a
 
         for a in self.game.players:
-            target_dist = a.pos - self.pos
+            if a.dead is False:
+                target_dist = a.pos - self.pos
 
-            if target_dist.length() < closest.length():
-                closest = target_dist
-                self.target = a
+                if target_dist.length() < closest.length():
+                    closest = target_dist
+                    self.target = a
 
         target_dist = closest
         if target_dist.length_squared() < (WEAPONS[self.weapon]['detect_radius'] - NIGHT_RADIUS) ** 2:
@@ -441,7 +483,8 @@ class Enemy(pg.sprite.Sprite):
                 rot = target_dist.angle_to(vec(1, 0))
 
                 if self.rot - 20 < rot < self.rot + 20:
-                    self.shoot()
+                    if self.game.main is True:
+                        self.shoot()
 
             else:
                 self.moving = True

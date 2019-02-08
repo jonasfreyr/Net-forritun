@@ -1,14 +1,29 @@
-import socket, _thread
-
-HOST = '0.0.0.0'   # Standard loopback interface address (localhost)
+import socket, _thread, time
+start_time = time.time()
+HOST = '10.220.226.65'   # Standard loopback interface address (localhost)
 PORT = 65432
 conns = []
 id = 1
-MAPNUM = 0
+MAPNUM = 1
+
+
+def console():
+    while True:
+        i = input(">> ")
+
+        if i == "time":
+            print(time.time() - start_time)
+
 
 def new_client(conn, addr, id):
     print("Connection started with:", addr)
     conn.sendall(str(MAPNUM).encode())
+    if len(conns) == 1:
+        conn.sendall(b'True')
+
+    else:
+        conn.sendall(b'False')
+
     while True:
         try:
             data = conn.recv(65536).decode()
@@ -28,7 +43,6 @@ def new_client(conn, addr, id):
 
                     if count == 0:
                         break
-
 
                 data = eval(s)
 
@@ -57,9 +71,20 @@ def new_client(conn, addr, id):
                 if a != conn:
                     a.sendall(data)
 
+
+def start_main():
+    try:
+        import shooter
+
+    except:
+        print("Main ended")
+
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
     s.listen(2)
+
+    _thread.start_new_thread(console, ())
+    _thread.start_new_thread(start_main, ())
     while True:
         conn, addr = s.accept()
 
