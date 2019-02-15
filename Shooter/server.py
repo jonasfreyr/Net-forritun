@@ -1,11 +1,12 @@
 import socket, _thread, time
 start_time = time.time()
-HOST = '10.220.226.65'   # Standard loopback interface address (localhost)
+HOST = '127.0.0.1'   # Standard loopback interface address (localhost)
 PORT = 65432
 conns = []
 id = 1
 MAPNUM = 1
 
+players = {}
 
 def console():
     while True:
@@ -26,7 +27,7 @@ def new_client(conn, addr, id):
 
     while True:
         try:
-            data = conn.recv(65536).decode()
+            data = conn.recv(262144).decode()
             try:
                 data = eval(data)
             except:
@@ -55,6 +56,7 @@ def new_client(conn, addr, id):
         except:
             print("Connection ended with:", addr)
 
+            del players[id]
             conns.remove(conn)
             data = str(id).encode()
             for a in conns:
@@ -64,12 +66,17 @@ def new_client(conn, addr, id):
 
         if conn not in conns:
             print("Connection ended with:", addr)
+            del players[id]
             break
 
         else:
-            for a in conns:
-                if a != conn:
-                    a.sendall(data)
+            players[id] = data
+
+            temp = dict(players)
+
+            del temp[id]
+
+            conn.sendall(str(temp).encode())
 
 
 def start_main():
@@ -83,8 +90,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
     s.listen(2)
 
-    _thread.start_new_thread(console, ())
     _thread.start_new_thread(start_main, ())
+    _thread.start_new_thread(console, ())
     while True:
         conn, addr = s.accept()
 

@@ -212,14 +212,18 @@ class Game:
 
     def receive_data(self, conn, i):
         while True:
-            data = conn.recv(65536).decode()
+            data = conn.recv(262144).decode()
             try:
                 data = eval(data)
             except:
                 s = ""
                 count = 0
+                first = False
+                pref = ""
                 for a in data:
-                    s = s + a
+
+                    if a == "{" and pref != "[":
+                        first = True
 
                     if a == "{":
                         count += 1
@@ -227,39 +231,47 @@ class Game:
                     elif a == "}":
                         count -= 1
 
-                    if count == 0:
+                    if first is True:
+                        s = s + a
+
+                    if count == 0 and first is not False:
                         break
+
+                    pref = a
 
                 data = eval(s)
             # {"x": self.player.pos.x, "y": self.player.pos.y, "wep": self.player.weapon, "rot": self.player.rot, "bullets": []}
             if not isinstance(data, int):
-                exist = False
-                for a in self.players:
-                    if a.id == data["id"]:
-                        a.pos.x = data["x"]
-                        a.pos.y = data["y"]
+                temp = data
+                for c in temp:
+                    data = eval(temp[c].decode())
+                    exist = False
+                    for a in self.players:
+                        if a.id == data["id"]:
+                            a.pos.x = data["x"]
+                            a.pos.y = data["y"]
 
-                        a.weapon = data["wep"]
-                        a.rot = data["rot"]
-                        a.bullets = data["bullets"]
-                        a.dead = data["dead"]
-                        exist = True
-                        break
+                            a.weapon = data["wep"]
+                            a.rot = data["rot"]
+                            a.bullets = data["bullets"]
+                            a.dead = data["dead"]
+                            exist = True
+                            break
 
-                for a in self.enemies:
-                    for b in data["enemies"]:
-                        if a.id == b["id"]:
-                            # {"pos": (a.pos.x, a.pos.y), "rot": a.rot, "wep": a.weapon, "id": a.id}
-                            a.pos.x = b["pos"][0]
-                            a.pos.y = b["pos"][1]
-                            a.rot = b["rot"]
-                            a.health = b["health"]
-                            a.is_ded = b["ded"]
+                    for a in self.enemies:
+                        for b in data["enemies"]:
+                            if a.id == b["id"]:
+                                # {"pos": (a.pos.x, a.pos.y), "rot": a.rot, "wep": a.weapon, "id": a.id}
+                                a.pos.x = b["pos"][0]
+                                a.pos.y = b["pos"][1]
+                                a.rot = b["rot"]
+                                a.health = b["health"]
+                                a.is_ded = b["ded"]
 
 
 
-                if exist is False:
-                    OPlayer(self, data["x"], data["y"], data["wep"], data["rot"], data["id"], data["bullets"])
+                    if exist is False:
+                        OPlayer(self, data["x"], data["y"], data["wep"], data["rot"], data["id"], data["bullets"])
 
             else:
                 for a in self.players:
@@ -505,7 +517,6 @@ class Game:
                     if sprite.selected is True:
                         pg.draw.rect(self.screen, RED, self.camera.apply_rect(sprite.hit_rect), 1)
             if isinstance(sprite, OPlayer):
-                print(sprite.id)
                 if sprite.dead is False and sprite.id != 1:
                     self.screen.blit(sprite.image, self.camera.apply(sprite))
 

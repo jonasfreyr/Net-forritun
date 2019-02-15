@@ -6,7 +6,7 @@ vec = pg.math.Vector2
 pg.init()
 root = tk.Tk()
 
-HOST = '10.220.226.65'
+HOST = '127.0.0.1'
 PORT = 65432
 MAIN = False
 # Colors
