@@ -317,10 +317,6 @@ class Game:
                 if event.key == pg.K_F1:
                     self.draw_hit_boxes = not self.draw_hit_boxes
 
-                if event.key == pg.K_F2:
-                    for a in self.enemies:
-                        a.kill()
-
     def update(self):
         self.all_sprites.update()
         #print(len(self.ally))
