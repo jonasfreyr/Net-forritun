@@ -440,72 +440,74 @@ class Enemy(pg.sprite.Sprite):
         self.rect.center = self.hit_rect.center
 
     def update(self):
-        if self.game.main is False:
-            self.target = self.game.player
-            closest = self.target.pos - self.pos
-        else:
-            closest = vec(99999,99999)
+        if self.is_ded is False:
+            if self.game.main is False:
+                self.target = self.game.player
+                closest = self.target.pos - self.pos
+            else:
+                closest = vec(99999,99999)
 
-        for a in self.game.ally:
-            target_dist = a.pos - self.pos
-
-            if target_dist.length() < closest.length():
-                closest = target_dist
-                self.target = a
-
-        for a in self.game.players:
-            if a.dead is False:
+            for a in self.game.ally:
                 target_dist = a.pos - self.pos
 
                 if target_dist.length() < closest.length():
                     closest = target_dist
                     self.target = a
 
-        target_dist = closest
-        if target_dist.length_squared() < (WEAPONS[self.weapon]['detect_radius'] - NIGHT_RADIUS) ** 2:
-            if self.line_collide() is False:
-                self.moving = False
+            for a in self.game.players:
+                if a.dead is False:
+                    target_dist = a.pos - self.pos
 
-                self.vel = vec(0, 0)
+                    if target_dist.length() < closest.length():
+                        closest = target_dist
+                        self.target = a
 
-                self.last_known = [int(self.target.pos.x), int(self.target.pos.y)]
+            target_dist = closest
+            if target_dist.length_squared() < (WEAPONS[self.weapon]['detect_radius'] - NIGHT_RADIUS) ** 2:
+                if self.line_collide() is False:
+                    self.moving = False
 
-                pos = self.pos + BARREL_OFFSET.rotate(-self.rot)
-                target_distA = self.target.pos - pos
+                    self.vel = vec(0, 0)
 
-                self.rot = self.rot_towards_target(target_distA)
+                    self.last_known = [int(self.target.pos.x), int(self.target.pos.y)]
 
-                self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
+                    pos = self.pos + BARREL_OFFSET.rotate(-self.rot)
+                    target_distA = self.target.pos - pos
 
-                self.rect = self.image.get_rect()
-                self.rect.center = self.pos
+                    self.rot = self.rot_towards_target(target_distA)
 
-                rot = target_dist.angle_to(vec(1, 0))
+                    self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
 
-                if self.rot - 20 < rot < self.rot + 20:
-                    if self.game.main is True:
-                        self.shoot()
+                    self.rect = self.image.get_rect()
+                    self.rect.center = self.pos
 
+                    rot = target_dist.angle_to(vec(1, 0))
+
+                    if self.rot - 20 < rot < self.rot + 20:
+                        if self.game.main is True:
+                            self.shoot()
+
+                else:
+                    self.moving = True
+                    self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
             else:
                 self.moving = True
                 self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
-        else:
-            self.moving = True
-            self.image = pg.transform.rotate(self.game.enemy_images[self.weapon], self.rot)
 
-        pos = [int(self.pos.x), int(self.pos.y)]
+            pos = [int(self.pos.x), int(self.pos.y)]
 
-        if ((pos[0] - 5 < self.last_known[0]) and (pos[1] - 5 < self.last_known[1])) and ((pos[0] + 5 > self.last_known[0]) and (pos[1] + 5 > self.last_known[1])):
-            self.moving = False
+            if ((pos[0] - 5 < self.last_known[0]) and (pos[1] - 5 < self.last_known[1])) and ((pos[0] + 5 > self.last_known[0]) and (pos[1] + 5 > self.last_known[1])):
+                self.moving = False
 
-        if self.moving and self.can_move is True:
-            self.move()
+            if self.moving and self.can_move is True:
+                self.move()
 
-        if self.health <= 0:
-            random.choice(self.game.enemy_hit_sounds).play()
-            self.kill()
-            self.game.map_img.blit(self.game.blood, self.pos - vec(TILESIZE / 2, TILESIZE / 2))
-            self.game.kills += 1
+            if self.health <= 0 and self.is_ded is False:
+                self.is_ded = True
+                random.choice(self.game.enemy_hit_sounds).play()
+                #self.kill()
+                self.game.map_img.blit(self.game.blood, self.pos - vec(TILESIZE / 2, TILESIZE / 2))
+                self.game.kills += 1
 
     def shoot(self):
         now = pg.time.get_ticks()

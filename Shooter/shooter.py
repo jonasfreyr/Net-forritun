@@ -405,8 +405,6 @@ class Game:
             for hit in hits:
                 a.health -= WEAPONS[hit.weapon]['damage']
                 a.vel = vec(0, 0)
-                if a.is_ded:
-                    a.kill()
 
         for a in self.ally:
             hits = pg.sprite.spritecollide(a, self.bullets, True, collide_hit_rect)
@@ -513,6 +511,9 @@ class Game:
             not_draw = False
             if isinstance(sprite, Enemy) or isinstance(sprite, Ally):
                 sprite.draw_health()
+                if isinstance(sprite, Enemy):
+                    if sprite.is_ded is True:
+                        not_draw = True
                 if isinstance(sprite, Ally):
                     if sprite.selected is True:
                         pg.draw.rect(self.screen, RED, self.camera.apply_rect(sprite.hit_rect), 1)
